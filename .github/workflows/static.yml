@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treinos</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; margin: 0; padding-bottom: 100px; -webkit-tap-highlight-color: transparent; }
+        
+        .header { position: sticky; top: 0; background: #fff; padding: 15px; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        
+        .footer-progress { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 15px; box-sizing: border-box; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000; }
+        .progress-bg { background: #eee; border-radius: 10px; height: 12px; width: 100%; overflow: hidden; margin-top: 5px; }
+        #progress-bar { background: #28a745; height: 100%; width: 0%; transition: 0.5s; }
+        #percent-text { font-size: 14px; font-weight: bold; color: #28a745; display: block; text-align: center; }
+
+        .controls-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; flex-wrap: wrap; gap: 10px; }
+        .tabs-container { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; align-items: center; }
+        
+        .tab { min-width: 35px; height: 35px; background: #ddd; border-radius: 50%; font-size: 14px; cursor: pointer; border: none; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        .tab.active { background: #007bff; color: white; transform: scale(1.1); }
+
+        .content { padding: 15px; }
+        
+        .planilha-titulo-container { text-align: center; margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 12px; border-bottom: 3px solid #007bff; }
+        .planilha-titulo-display { font-size: 22px; font-weight: bold; color: #333; margin: 0; letter-spacing: -0.5px; }
+        .planilha-titulo-edit { width: 90%; border: 2px dashed #007bff; padding: 8px; border-radius: 8px; font-size: 20px; font-weight: bold; text-align: center; color: #007bff; background: #f0f7ff; outline: none; }
+
+        .table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { border: 1px solid #f0f0f0; padding: 12px 8px; text-align: center; font-size: 12px; position: relative; height: 50px; }
+        th { background: #f8f8f8; color: #666; }
+        
+        .treino { cursor: pointer; user-select: none; }
+        .done { background-color: #d4edda !important; color: #155724; font-weight: bold; }
+        .missed { background-color: #f8d7da !important; color: #721c24; font-weight: bold; }
+        .off { background-color: #fafafa; color: #bbb; font-style: italic; }
+        
+        .has-desc::after { content: '📝'; position: absolute; top: 2px; right: 2px; font-size: 10px; }
+        
+        .edit-input { width: 90%; border: 1px solid #007bff; padding: 4px; font-size: 11px; border-radius: 4px; text-align: center; }
+
+        .btn { border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .btn-add { background: #007bff; color: white; }
+        .btn-lock { background: #6c757d; color: white; }
+        .btn-lock.active { background: #dc3545; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 20px; z-index: 2000; width: 85%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1999; backdrop-filter: blur(4px); }
+        textarea { width: 100%; height: 120px; margin: 10px 0; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay" onclick="fecharModais()"></div>
+
+<div id="modal-desc" class="modal">
+    <h3 style="margin-top:0">📝 Detalhes do Treino</h3>
+    <p id="desc-target-name" style="font-weight: bold; color: #007bff; margin-bottom: 5px;"></p>
+    <textarea id="input-desc" placeholder="Adicione uma nota..."></textarea>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn" style="flex:1; justify-content: center; background: #eee;" onclick="fecharModais()">Cancelar</button>
+        <button class="btn btn-add" style="flex:2; justify-content: center;" onclick="salvarDescricao()">Salvar Nota</button>
+    </div>
+</div>
+
+<div class="header">
+    <strong style="color: #333;">🏃 Meus Treinos</strong>
+    <button class="btn btn-add" onclick="toggleEditor()">+ Nova Planilha</button>
+</div>
+
+<div class="footer-progress">
+    <span id="percent-text">0% concluído</span>
+    <div class="progress-bg"><div id="progress-bar"></div></div>
+</div>
+
+<div class="controls-row">
+    <div class="tabs-container">
+        <div id="tabs-planilhas" style="display: flex; gap: 8px;"></div>
+    </div>
+    <button id="btn-lock" class="btn btn-lock" onclick="toggleModoEdicao()" style="display:none;">
+        <span id="lock-icon">🔒</span> <span id="lock-text">Editar</span>
+    </button>
+</div>
+
+<div class="content">
+    <div id="view-planilha">
+        <div class="planilha-titulo-container" id="titulo-area">
+            <h2 class="planilha-titulo-display" id="planilha-nome-texto">Nenhuma Planilha</h2>
+            <input type="text" id="edit-nome-plano" class="planilha-titulo-edit" oninput="renomearPlano()">
+        </div>
+
+        <div id="editor" style="display:none; background:#fff; padding:15px; border-radius:8px; margin-bottom:15px; border:2px solid #007bff;">
+            <strong>🎯 Nova Planilha:</strong>
+            <input type="text" id="nomePlano" placeholder="Nome (ex: Maratona)" style="width:100%; padding:10px; margin:10px 0; border: 1px solid #ccc; border-radius: 5px;">
+            <textarea id="inputDados" placeholder="Cole aqui os treinos separados por vírgula..."></textarea>
+            <button class="btn btn-add" style="width:100%; justify-content: center;" onclick="criarNovoPlano()">Salvar Nova Planilha</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Sem.</th><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th></tr></thead>
+                <tbody id="corpoTabela"></tbody>
+            </table>
+        </div>
+        <button id="btn-del-planilha" class="btn" style="background:#ffdede; color:red; margin-top:20px; font-size:11px; display:none;" onclick="deletarPlanoAtivo()">Excluir Planilha #<span id="del-num"></span></button>
+    </div>
+</div>
+
+<script>
+    let planos = JSON.parse(localStorage.getItem('meus_planos')) || [];
+    let abaAtiva = localStorage.getItem('aba_ativa') || 0;
+    let progresso = JSON.parse(localStorage.getItem('progresso_geral')) || {};
+    let descricoes = JSON.parse(localStorage.getItem('descricoes_treinos')) || {};
+    let modoEdicao = false;
+    let longPressTimer;
+    let isLongPress = false;
+    let currentCellId;
+
+    function abrirAba(id) {
+        abaAtiva = id;
+        localStorage.setItem('aba_ativa', id);
+        modoEdicao = false; 
+        renderizarTudo();
+    }
+
+    function toggleModoEdicao() {
+        modoEdicao = !modoEdicao;
+        renderizarTudo();
+    }
+
+    function renomearPlano() {
+        const novoNome = document.getElementById('edit-nome-plano').value;
+        const idx = parseInt(abaAtiva);
+        if(planos[idx]) {
+            planos[idx].nome = novoNome;
+            document.getElementById('planilha-nome-texto').innerText = novoNome;
+            localStorage.setItem('meus_planos', JSON.stringify(planos));
+        }
+    }
+
+    function renderAbas() {
+        const tabsPlanilhas = document.getElementById('tabs-planilhas');
+        tabsPlanilhas.innerHTML = '';
+        planos.forEach((p, i) => {
+            const btn = document.createElement('button');
+            btn.className = `tab ${abaAtiva == i ? 'active' : ''}`;
+            btn.innerText = i + 1;
+            btn.onclick = () => abrirAba(i);
+            tabsPlanilhas.appendChild(btn);
+        });
+    }
+
+    function renderizarTudo() {
+        const btnLock = document.getElementById('btn-lock');
+        const txtNome = document.getElementById('planilha-nome-texto');
+        const inputNome = document.getElementById('edit-nome-plano');
+        const spanDel = document.getElementById('del-num');
+        const btnDel = document.getElementById('btn-del-planilha');
+        
+        renderAbas();
+
+        if (planos.length === 0) {
+            btnLock.style.display = 'none';
+            btnDel.style.display = 'none';
+            txtNome.innerText = "Crie uma planilha no botão +";
+        } else {
+            btnLock.style.display = 'flex';
+            btnDel.style.display = 'block';
+            
+            const lockIcon = document.getElementById('lock-icon');
+            btnLock.className = modoEdicao ? 'btn btn-lock active' : 'btn btn-lock';
+            lockIcon.innerText = modoEdicao ? '🔓' : '🔒';
+            
+            if(!planos[abaAtiva]) abaAtiva = 0;
+            
+            txtNome.innerText = planos[abaAtiva].nome;
+            inputNome.value = planos[abaAtiva].nome;
+            txtNome.style.display = modoEdicao ? 'none' : 'block';
+            inputNome.style.display = modoEdicao ? 'inline-block' : 'none';
+            spanDel.innerText = parseInt(abaAtiva) + 1;
+
+            renderTabela();
+        }
+        atualizarProgresso();
+    }
+
+    function renderTabela() {
+        const corpo = document.getElementById('corpoTabela');
+        corpo.innerHTML = '';
+        const idx = parseInt(abaAtiva);
+        
+        if(planos[idx]) {
+            planos[idx].dados.forEach((semana, sIdx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="color:red; font-weight:bold">${sIdx + 1}</td>`;
+                semana.forEach((treino, dIdx) => {
+                    const td = document.createElement('td');
+                    const id = `aba${idx}-s${sIdx}-d${dIdx}`;
+                    
+                    if(modoEdicao) {
+                        const input = document.createElement('input');
+                        input.className = 'edit-input';
+                        input.value = treino;
+                        input.onchange = (e) => {
+                            planos[idx].dados[sIdx][dIdx] = e.target.value;
+                            localStorage.setItem('meus_planos', JSON.stringify(planos));
+                        };
+                        td.appendChild(input);
+                    } else {
+                        td.innerText = treino;
+                        if(treino.toLowerCase() === 'off') {
+                            td.className = 'off';
+                        } else {
+                            td.className = 'treino';
+                            if(progresso[id] === true) td.classList.add('done');
+                            if(progresso[id] === 'missed') td.classList.add('missed');
+                            if(descricoes[id] && descricoes[id].trim() !== '') td.classList.add('has-desc');
+
+                            const iniciarPressao = () => {
+                                isLongPress = false;
+                                longPressTimer = setTimeout(() => {
+                                    isLongPress = true;
+                                    abrirModalDesc(id, treino);
+                                }, 1000);
+                            };
+
+                            const cancelarPressao = () => clearTimeout(longPressTimer);
+
+                            td.ontouchstart = iniciarPressao;
+                            td.ontouchend = (e) => {
+                                if(isLongPress) e.preventDefault();
+                                cancelarPressao();
+                            };
+
+                            td.onmousedown = iniciarPressao;
+                            td.onmouseup = cancelarPressao;
+
+                            td.onclick = () => {
+                                if(isLongPress) return;
+                                if (td.classList.contains('missed')) {
+                                    td.classList.remove('missed');
+                                    progresso[id] = false;
+                                } else {
+                                    td.classList.toggle('done');
+                                    progresso[id] = td.classList.contains('done');
+                                }
+                                salvarEAtualizar();
+                            };
+
+                            td.ondblclick = () => {
+                                td.classList.remove('done');
+                                td.classList.toggle('missed');
+                                progresso[id] = td.classList.contains('missed') ? 'missed' : false;
+                                salvarEAtualizar();
+                            };
+                            
+                            td.oncontextmenu = (e) => e.preventDefault();
+                        }
+                    }
+                    tr.appendChild(td);
+                });
+                corpo.appendChild(tr);
+            });
+        }
+    }
+
+    function salvarEAtualizar() {
+        localStorage.setItem('progresso_geral', JSON.stringify(progresso));
+        atualizarProgresso();
+    }
+
+    function abrirModalDesc(id, nome) {
+        currentCellId = id;
+        document.getElementById('desc-target-name').innerText = nome;
+        document.getElementById('input-desc').value = descricoes[id] || '';
+        document.getElementById('modal-desc').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function salvarDescricao() {
+        const val = document.getElementById('input-desc').value;
+        if(val.trim() === "") {
+            delete descricoes[currentCellId];
+        } else {
+            descricoes[currentCellId] = val;
+        }
+        localStorage.setItem('descricoes_treinos', JSON.stringify(descricoes));
+        fecharModais();
+        renderizarTudo();
+    }
+
+    function fecharModais() {
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        document.getElementById('overlay').style.display = 'none';
+        isLongPress = false;
+    }
+
+    function toggleEditor() {
+        const ed = document.getElementById('editor');
+        ed.style.display = ed.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function criarNovoPlano() {
+        const nome = document.getElementById('nomePlano').value || "Novo Plano";
+        const texto = document.getElementById('inputDados').value;
+        if(!texto) return;
+        const linhas = texto.split('\n').filter(l => l.trim() !== '');
+        const novosDados = linhas.map(l => l.split(',').map(i => i.trim()));
+        planos.push({ nome, dados: novosDados });
+        localStorage.setItem('meus_planos', JSON.stringify(planos));
+        abaAtiva = planos.length - 1;
+        toggleEditor();
+        renderizarTudo();
+    }
+
+    // NOVA LÓGICA DE PROGRESSO: Verde soma, Vermelho subtrai
+    function atualizarProgresso() {
+        const total = document.querySelectorAll('.treino').length;
+        const feitos = document.querySelectorAll('.treino.done').length;
+        const perdidos = document.querySelectorAll('.treino.missed').length;
+        
+        // A lógica: (Feitos - Perdidos) dividido pelo total
+        // Se houver mais perdidos que feitos, o resultado não fica menor que 0
+        const saldo = Math.max(0, feitos - perdidos);
+        const porc = total > 0 ? Math.round((saldo / total) * 100) : 0;
+        
+        document.getElementById('progress-bar').style.width = porc + '%';
+        document.getElementById('percent-text').innerText = porc + '% concluído';
+        
+        // Se a porcentagem cair por causa dos treinos perdidos, a cor da barra muda para indicar atenção? 
+        // Por enquanto mantive verde (#28a745) como você pediu.
+    }
+
+    function deletarPlanoAtivo() {
+        if(confirm(`Deseja apagar a Planilha #${parseInt(abaAtiva)+1}?`)) {
+            planos.splice(abaAtiva, 1);
+            localStorage.setItem('meus_planos', JSON.stringify(planos));
+            abaAtiva = 0;
+            renderizarTudo();
+        }
+    }
+
+    renderizarTudo();
+</script>
+</body>
+</html>
